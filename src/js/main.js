@@ -53,6 +53,7 @@
                             }
                         }
                         else {
+                            //test
                             display.ctx.drawImage(this.tileImg, this.x, this.y);
                         }
                     }
