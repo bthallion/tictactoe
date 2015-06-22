@@ -5,56 +5,58 @@
             this.lineWidth   = 8;
             this.strokeStyle = '#FFFFFF';
             this.fillStyle   = '#FF69B4';
-            this.margin      = this.tileDim / 20;
+            this.margin      = this.tileDim / 10;
         })(),
         //Tile constructor
         tile = function (xPos, yPos) {
-
             var dim = boardSpecs.tileDim,
-                //Tile object
-                that = {
+                my = {
                     x: xPos,
                     y: yPos,
                     tileImg: tile.BTile,
-                    animCount: 0,
+                    animCount: 0
+                },
+                that = {
                     isEmpty: function () {
-                        return this.tileImg === tile.BTile;
+                        return my.tileImg === tile.BTile;
                     },
                     assign: function (player) {
-                        this.tileImg = player.getTile();
+                        my.tileImg = player.getTile();
                     },
                     active: function () {
-                        return this.animCount > 0;
+                        return my.animCount > 0;
+                    },
+                    animate: function () {
+                        my.animCount = 1;
                     },
                     update: function () {
-                        this.animCount -= .03;
+                        my.animCount -= .03;
                     },
                     draw: function () {
                         var colWidth, img, xPos, absFunc, verStretch;
 
-                        if (this.animCount > 0) {
+                        if (my.animCount > 0) {
                             colWidth = 2;
-                            img      = this.animCount > .5 ? tile.BTile : this.tileImg;
-                            absFunc  = -Math.abs(2 * this.animCount - 1) + 1;
+                            img      = my.animCount > .5 ? tile.BTile : my.tileImg;
+                            absFunc  = -Math.abs(2 * my.animCount - 1) + 1;
                             //Draws slices of tile image dependent on animCount variable
                             for (xPos = 0;  xPos < 100; xPos += colWidth) {
-                                verStretch = (dim / 2) - (this.animCount > .5 ? 100 - xPos : xPos);
+                                verStretch = (dim / 2) - (my.animCount > .5 ? 100 - xPos : xPos);
                                 display.ctx.drawImage(
                                     img, //Tile image to use
                                     xPos, //X position on img
                                     0, //Y position on img
                                     colWidth, //Width of clipped image
                                     dim, //Height of clipped image
-                                    this.x + xPos - absFunc * (xPos - dim / 2), //X Position on canvas
-                                    this.y - .2 * (verStretch * absFunc), //Y Position on canvas
+                                    my.x + xPos - absFunc * (xPos - dim / 2), //X Position on canvas
+                                    my.y - .2 * (verStretch * absFunc), //Y Position on canvas
                                     colWidth, //Width of image rendered
                                     dim + .4 * (verStretch * absFunc)//Height of img
                                 );
                             }
                         }
                         else {
-                            //test
-                            display.ctx.drawImage(this.tileImg, this.x, this.y);
+                            display.ctx.drawImage(my.tileImg, my.x, my.y);
                         }
                     }
                 },
@@ -62,13 +64,14 @@
                 tileCtx;
 
             //Create X, O and Blank tiles
-            if (that.tileImg === undefined) {
+            if (my.tileImg === undefined) {
                 tileCanvas          = document.createElement('canvas');
                 tileCanvas.width    = tileCanvas.height = dim;
                 tileCtx             = tileCanvas.getContext('2d');
                 tileCtx.lineWidth   = boardSpecs.lineWidth;
                 tileCtx.strokeStyle = boardSpecs.strokeStyle;
                 tileCtx.fillStyle   = boardSpecs.fillStyle;
+                tileCtx.lineCap     = 'round';
                 tile.BTile          = createTemplate();
                 tile.OTile          = createTemplate(
                     [tileCtx.arc, dim / 2, dim / 2, dim / 2 * .8, 0, Math.PI * 2]
@@ -79,7 +82,7 @@
                     [tileCtx.moveTo, dim * .9, dim * .1],
                     [tileCtx.lineTo, dim * .1, dim * .9]
                 );
-                that.tileImg = tile.BTile;
+                my.tileImg = tile.BTile;
             }
 
             return that;
@@ -109,25 +112,13 @@
         //Player constructor
         player = function (t) {
             var my = {
-                    tile: t,
-                    turn: false
-                },
-                that = {
-                    getTile: function () {
-                        return my.tile;
-                    },
-                    isTurn: function () {
-                        return my.turn === true;
-                    }
-                };
-            that.setTurn = function (t) {
-                my.turn = t;
+                tile: t
             };
-            return that;
-        },
-        //AI constructor
-        ai = function (t) {
-            return player(t);
+            return {
+                getTile: function () {
+                    return my.tile;
+                }
+            };
         },
 
         display = {
@@ -180,13 +171,17 @@
 
         game = {
             tiles: [],
-            user: undefined,
-            ai: undefined,
+            p1: undefined,
+            p2: undefined,
+            currentPlayer: undefined,
             init: function () {
                 display.init();
-                this.user = player(tile.XTile);
-                this.ai   = ai(tile.OTile);
-                this.user.setTurn(true);
+                this.p1            = player(tile.XTile);
+                this.p2            = player(tile.OTile);
+                this.currentPlayer = this.p1;
+            },
+            nextPlayer: function () {
+                this.currentPlayer = (this.currentPlayer === this.p1) ? this.p2 : this.p1;
             }
         };
 
@@ -196,9 +191,6 @@
             i,
             boardBlock = boardSpecs.tileDim + boardSpecs.margin;
 
-        if ( !game.user.isTurn() ) {
-            return;
-        }
         //Shift click coordinates to zero at upper left of board
         pointX = evt.clientX - evt.target.offsetLeft;
         pointY = evt.clientY - evt.target.offsetTop;
@@ -207,9 +199,9 @@
             i = Math.floor(pointX / boardBlock)
               + Math.floor(pointY / boardBlock) * 3;
             if ( game.tiles[i].isEmpty() ) {
-                game.tiles[i].assign(game.user);
-                game.tiles[i].animCount = 1;
-                //game.user.setTurn(false);
+                game.tiles[i].assign(game.currentPlayer);
+                game.tiles[i].animate();
+                game.nextPlayer();
             }
         }
     }
