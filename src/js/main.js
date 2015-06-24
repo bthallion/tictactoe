@@ -13,15 +13,20 @@
                 my = {
                     x: xPos,
                     y: yPos,
-                    tileImg: tile.BTile,
+                    tileFront: tile.BTile,
+                    tileBack: undefined,
                     animCount: 0
                 },
                 that = {
                     isEmpty: function () {
-                        return my.tileImg === tile.BTile;
+                        return my.tileFront === tile.BTile;
                     },
-                    assign: function (player) {
-                        my.tileImg = player.getTile();
+                    assign: function (tf) {
+                        my.tileBack = my.tileFront;
+                        my.tileFront = tf;
+                    },
+                    getTileFront: function () {
+                        return my.tileFront;
                     },
                     active: function () {
                         return my.animCount > 0;
@@ -37,7 +42,7 @@
 
                         if (my.animCount > 0) {
                             colWidth = 2;
-                            img      = my.animCount > .5 ? tile.BTile : my.tileImg;
+                            img      = my.animCount > .5 ? my.tileBack : my.tileFront;
                             absFunc  = -Math.abs(2 * my.animCount - 1) + 1;
                             //Draws slices of tile image dependent on animCount variable
                             for (xPos = 0;  xPos < 100; xPos += colWidth) {
@@ -56,7 +61,7 @@
                             }
                         }
                         else {
-                            display.ctx.drawImage(my.tileImg, my.x, my.y);
+                            display.ctx.drawImage(my.tileFront, my.x, my.y);
                         }
                     }
                 },
@@ -64,7 +69,7 @@
                 tileCtx;
 
             //Create X, O and Blank tiles
-            if (my.tileImg === undefined) {
+            if (my.tileFront === undefined) {
                 tileCanvas          = document.createElement('canvas');
                 tileCanvas.width    = tileCanvas.height = dim;
                 tileCtx             = tileCanvas.getContext('2d');
@@ -82,7 +87,7 @@
                     [tileCtx.moveTo, dim * .9, dim * .1],
                     [tileCtx.lineTo, dim * .1, dim * .9]
                 );
-                my.tileImg = tile.BTile;
+                my.tileFront = tile.BTile;
             }
 
             return that;
@@ -112,11 +117,11 @@
         //Player constructor
         player = function (t) {
             var my = {
-                tile: t
+                tileFront: t
             };
             return {
-                getTile: function () {
-                    return my.tile;
+                getTileFront: function () {
+                    return my.tileFront;
                 }
             };
         },
@@ -174,6 +179,9 @@
             p1: undefined,
             p2: undefined,
             currentPlayer: undefined,
+            paused: false,
+            result: undefined,
+            over: false,
             init: function () {
                 display.init();
                 this.p1            = player(tile.XTile);
@@ -191,6 +199,15 @@
             i,
             boardBlock = boardSpecs.tileDim + boardSpecs.margin;
 
+        if (game.paused) {
+            if (game.over) {
+                reset();
+            }
+            return;
+        }
+        else {
+            game.paused = true;
+        }
         //Shift click coordinates to zero at upper left of board
         pointX = evt.clientX - evt.target.offsetLeft;
         pointY = evt.clientY - evt.target.offsetTop;
@@ -199,11 +216,85 @@
             i = Math.floor(pointX / boardBlock)
               + Math.floor(pointY / boardBlock) * 3;
             if ( game.tiles[i].isEmpty() ) {
-                game.tiles[i].assign(game.currentPlayer);
+                game.tiles[i].assign(game.currentPlayer.getTileFront());
                 game.tiles[i].animate();
-                game.nextPlayer();
             }
         }
+        if ( gameOver() ) {
+            winText();
+        }
+        else {
+            game.nextPlayer();
+            game.paused = false;
+        }
+    }
+
+    function gameOver() {
+        var winPatterns = [
+                "111000000", "000111000",
+                "000000111", "100100100",
+                "010010010", "001001001",
+                "100010001", "001010100"
+            ],
+            boardState = "",
+            tie = true,
+            i, match;
+        for (i = 0; i < game.tiles.length; i++) {
+            boardState += ( game.tiles[i].getTileFront() === game.currentPlayer.getTileFront() )
+                ? "1" : "0";
+            if (game.tiles[i].getTileFront() === tile.BTile) {
+                tie = false;
+            }
+        }
+        boardState = parseInt(boardState, 2);
+        for (i = 0; i < winPatterns.length; i++) {
+            winPatterns[i] = parseInt(winPatterns[i], 2);
+            match = boardState & winPatterns[i];
+            if (match === winPatterns[i]) {
+                game.result = game.currentPlayer;
+                return true;
+            }
+        }
+        return tie;
+    }
+
+    function winText() {
+        var playerName, title, resultText;
+        resultText = document.getElementById("result");
+        if (game.result) {
+            playerName = (game.result === game.p2) ? "O\'s" : "X\'s";
+            resultText.innerHTML = playerName + " win! Tap to play again";
+        }
+        else {
+            resultText.innerHTML = "Tied game. Tap to play again";
+        }
+        $('#title').animate({
+            top: '-250px'
+        });
+        $('#result').animate({
+            top: '0px'
+        });
+        game.over = true;
+    }
+
+    function reset() {
+        var i;
+        for (i = 0; i < game.tiles.length; i++) {
+            if (game.tiles[i].getTileFront() !== tile.BTile) {
+                game.tiles[i].assign(tile.BTile);
+                game.tiles[i].animate();
+            }
+        }
+        game.currentPlayer = (game.currentPlayer === game.p1) ? game.p2 : game.p1;
+        game.over = game.paused = false;
+        game.result = undefined;
+        $('#title').animate({
+            top: '0px'
+        });
+        $('#result').animate({
+            top: '-250px'
+        }).html("");
+
     }
 
     document.addEventListener("DOMContentLoaded", function () {
